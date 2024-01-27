@@ -1,10 +1,9 @@
-import julia
-julia.install()
+print("loading")
+from julia.api import Julia
+jl = Julia(compiled_modules=False)
+
 from julia import Base
-Base.sind(90)
-
-
-
-
-
+print("---->")
+print(Base.sind(90))
+print(Base.sind(0))
 
