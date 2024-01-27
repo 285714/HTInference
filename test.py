@@ -228,7 +228,7 @@ def sm_update_(A, c, d):
 
     import pdb; pdb.set_trace()
 
-def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=2000, loss_threshold=1e-20, verbose=False):
+def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=2000, loss_threshold=1e-3, verbose=False):
     loss_threshold_count = 0
     m = np.zeros_like(X)
     v = np.zeros_like(X)
@@ -270,12 +270,12 @@ def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=20
 
 
 
-# rnd =  rnd_stoch
+rnd =  rnd_stoch
 # rnd = rnd_euler
-rnd = rnd_sym_stoch
+# rnd = rnd_sym_stoch
 
 
-n = 5
+n = 50
 # M_true = rnd_sym_stoch(n)
 M_true = rnd(n)
 
@@ -309,6 +309,7 @@ Linv = np.linalg.pinv(L)
 loss = lambda Linv: hitting_times_loss(H_true, Linv)
 grad = lambda Linv: numeric_grad(loss, Linv)
 
+print("Adam:")
 Linv = adam(Linv, grad, loss, verbose=True)
 
 """
