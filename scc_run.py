@@ -6,26 +6,62 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
 
-    # test_single_chain(10, "complete", True)
+    """
+    nba_ht(2, "NYK", 2022)
+
+
+    plot_test_mixture({
+        "n": np.linspace(2, 20, 10, dtype=int),
+        "k": [2],
+        "n_trails": [10000],
+        "trail_len": [100],
+        "num_iters": [100],
+        "seed": range(5),
+    })
+
+    plot_test_mixture({
+        "n": np.linspace(10, 100, 10, dtype=int),
+        "k": [2],
+        "n_trails": [10000],
+        "trail_len": [1000],
+        "num_iters": [100],
+        "seed": range(5),
+    })
+    """
+
 
     plot_test_single_chain({
-        "n": np.linspace(5, 20, 5, dtype=int),
-        "graph_type": ["complete", "lollipop", "star"],
-        "random": [False],
+        "n": np.linspace(20, 500, 10, dtype=int),
+        "graph_type": ["complete"],
+        "random": [True],
         "from_trails": [False],
         "n_trails": [2000],
         "trail_len": [200],
+        "max_iter": [50000],
         "seed": range(5),
     })
+
 
     """
     plot_test_single_chain({
         "n": np.linspace(5, 20, 5, dtype=int),
-        "graph_type": ["complete", "lollipop", "star"],
-        "random": [True],
-        "from_trails": [True],
+        "graph_type": ["complete", "lollipop", "star", "grid"],
+        "random": [False],
+        "from_trails": [False],
         "n_trails": [2000],
         "trail_len": [200],
+        "max_iter": [10000],
+        "seed": range(5),
+    })
+
+    plot_test_single_chain({
+        "n": np.linspace(5, 10, 6, dtype=int),
+        "graph_type": ["complete", "lollipop", "star", "grid"],
+        "random": [False],
+        "from_trails": [True],
+        "n_trails": [10000],
+        "trail_len": [500],
+        "max_iter": [10000],
         "seed": range(5),
     })
     """

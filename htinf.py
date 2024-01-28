@@ -26,9 +26,9 @@ def hitting_times(mixture):
 def hitting_times_from_trails(n, trails):
     return ht.hitting_times(n, trails)
 
-def ht_learn(H):
+def ht_learn(H, max_iter=10000):
     n, _ = H.shape
-    M = ht.ht_learn(H)
+    M = ht.ht_learn(H, max_iter=max_iter)
     S = np.array([np.ones(n)])
     Ms = np.array([M])
     mixture = dt.Mixture(S, Ms)
@@ -36,8 +36,17 @@ def ht_learn(H):
     return mixture
 
 def get_trails(mixture, n_trails, trail_len):
-    m = ht.to_mixture([mixture.S[0]], [mixture.Ms[0]])
+    m = ht.to_mixture([s for s in mixture.S], [M for M in mixture.Ms])
     return ht.get_trails(m, n_trails, trail_len)
     # return ht.get_trails(mixture.S[0], mixture.Ms[0], n_trails, trail_len)
 
+def em(n, k, trails, num_iters=100):
+    m = ht.em(n, k, trails, num_iters=num_iters)
+    S, Ms = ht.from_mixture(m)
+    return dt.Mixture(np.array(S), np.array(Ms))
+
+def em_ct(n, k, trails, num_iters=100):
+    m = ht.em_ct(n, k, trails, num_iters=num_iters)
+    S, Ms = ht.from_mixture(m)
+    return dt.Mixture(np.array(S), np.array(Ms))
 
