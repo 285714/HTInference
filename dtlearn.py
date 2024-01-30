@@ -609,3 +609,21 @@ def em_learn(n, L, trails, max_iter=100, init=None, conv_thresh=1e-5, verbose=Fa
 #       return mixture
 
 
+
+
+learners = {
+    "CA-SVD": svd_learn_new,
+    "CA-SVD'": lambda d, n, L: svd_learn_new(d, n, L, sample_dist=0.01),
+    "GKV-SVD": svd_learn,
+    "EM2": lambda d, n, L: em_learn(d, n, L, max_iter=2),
+    "EM5": lambda d, n, L: em_learn(d, n, L, max_iter=5),
+    "EM20": lambda d, n, L: em_learn(d, n, L, max_iter=20),
+    "EM50": lambda d, n, L: em_learn(d, n, L, max_iter=50),
+    "EM100": lambda d, n, L: em_learn(d, n, L, max_iter=100),
+    "EM-converge": em_learn,
+    "CA-SVD-EM2": lambda d, n, L: svd_learn_new(d, n, L, em_refine_max_iter=2),
+    "CA-SVD-EM5": lambda d, n, L: svd_learn_new(d, n, L, em_refine_max_iter=5),
+    "CA-SVD-EM20": lambda d, n, L: svd_learn_new(d, n, L, em_refine_max_iter=20),
+    "CA-SVD-EM100": lambda d, n, L: svd_learn_new(d, n, L, em_refine_max_iter=100),
+}
+

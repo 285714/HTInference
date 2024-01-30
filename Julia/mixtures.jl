@@ -5,6 +5,7 @@ import Graphs.SimpleGraphs
 import Base.show
 import Hungarian
 import StatsBase
+import Random
 using LinearAlgebra
 
 
@@ -14,6 +15,20 @@ struct Mixture
     trans
 end
 
+
+function normalize!(m)
+    m.start ./= sum(m.start)
+    m.trans ./= sum(m.trans, dims=2)
+end
+
+function get_rates(m)
+    _, k = size(m.start)
+    rates = copy(m.trans)
+    for i in 1:k
+        rates[:, :, i] -= I
+    end
+    rates
+end
 
 function show(io::IO, m::Mixture)
     n, k = size(m.start)
@@ -61,7 +76,7 @@ function distance(m1::Mixture, m2::Mixture)
     D = reshape(m1.trans, (n, n, k, 1)) .- reshape(m2.trans, (n, n, 1, k))
     W = dropdims(sum(abs.(D), dims=(1, 2)), dims=(1, 2))
     _, dist = Hungarian.hungarian(W)
-    dist
+    dist / (2 * n * k)
 end
 
 function sample_trails(m::Mixture; n_trails=1::Int, trail_len=10::Int)
@@ -79,6 +94,44 @@ function sample_trails(m::Mixture; n_trails=1::Int, trail_len=10::Int)
         for _ in 1:trail_len
             push!(trail, x)
             x = StatsBase.wsample(M[x, :])
+        end
+    end
+    (trails, chains)
+end
+
+function sample_trails_ct(m::Mixture; n_trails=1::Int, trail_len=10::Int)
+    n, k = size(m.start)
+    rates = get_rates(m)
+    trans_ = copy(rates)
+    for i in 1:k
+        for j in 1:n
+            trans_[j, j, i] = 0
+        end
+    end
+    trans = trans_ ./ sum(trans_, dims=2)
+    trails = []
+    chains = []
+    start = reduce(vcat, m.start)
+    for _ in 1:n_trails
+        x, l = divrem(StatsBase.wsample(start)-1, k)
+        K = rates[:, :, l+1]
+        K_ = trans_[:, :, l+1]
+        M = trans[:, :, l+1]
+        x += 1
+        t = 0.0
+        trail = Array{Tuple{Int, Float64}, 1}()
+        push!(trails, trail)
+        push!(chains, l+1)
+        for _ in 1:trail_len
+            push!(trail, (x, t))
+            ts = Random.randexp(n) ./ K_[x, :]
+            y = argmin(ts)
+            t = ts[y]
+            """
+            y = StatsBase.wsample(M[x, :])
+            t = Random.randexp() / K[x, y]
+            """
+            x = y
         end
     end
     (trails, chains)

@@ -1,5 +1,5 @@
-import torch
-from torch.utils.data import Dataset, DataLoader
+# import torch
+# from torch.utils.data import Dataset, DataLoader
 
 
 import numpy as np
@@ -40,7 +40,7 @@ class NBADataset: # (Dataset):
         return np.array(self.df.trail_dt.tolist())
     
     def get_trails_ct(self):
-        return np.array(self.df.trail_ct.tolist())
+        return self.df.trail_ct.tolist()
     
     def get_labels(self):
         return np.array(self.df.ptsScored > 0).astype(int)
