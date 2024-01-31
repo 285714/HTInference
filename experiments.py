@@ -2,6 +2,8 @@ import numpy as np
 import itertools
 import networkx as nx
 import matplotlib.pyplot as plt
+import time
+from scipy.optimize import linear_sum_assignment
 
 from utils import *
 import dtlearn as dt
@@ -13,6 +15,18 @@ plt.rcParams.update({
     'font.size': 13,
 })
 
+
+
+def create_mixture_dt(n, k, mix_type=None):
+    if mix_type == None:
+        return dt.Mixture.random(n, k)
+    elif mix_type == "stargrid":
+        assert(k == 2)
+        m1 = create_graph(n, "star")
+        m2 = create_graph(n, "grid")
+        m = dt.Mixture(np.array([m1.S[0], m2.S[0]]), np.array([m1.Ms[0], m2.Ms[0]]))
+        m.normalize()
+        return m
 
 
 def create_graph(n, graph_type, random=False, selfloops=True):
@@ -43,14 +57,79 @@ def create_graph(n, graph_type, random=False, selfloops=True):
     return mixture
 
 
-def test_grid(n, max_iter):
+@memoize
+def test_grid(n, max_iter, noise_std=0, seed=None):
     import htinf
     mixture = create_graph(n, "grid", selfloops=True)
     H_true = htinf.hitting_times(mixture)
-    learned_mixture = htinf.ht_learn(H_true, max_iter=max_iter)
+    H_noise = H_true + np.random.normal(0, noise_std, size=H_true.shape)
+    learned_mixture, loss = htinf.ht_learn(H_noise, max_iter=max_iter, return_loss=True)
     tv = mixture.recovery_error(learned_mixture)
     print(mixture)
     print(learned_mixture)
+    return {"tv": tv, "loss": loss, "mixture": learned_mixture}
+
+@genpath
+def plot_test_grid(setup, savefig=None):
+    df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
+    df = df.join(df.astype("object").apply(lambda row: test_grid(row.n, row.max_iter, noise_std=row.noise_std, seed=row.seed),
+                  axis=1, result_type='expand'))
+
+    grp = df.groupby("noise_std")
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+
+    x = grp["tv"]
+    mean = x.mean()
+    std = x.std()
+    config = next_config()
+    ax1.plot(mean.index, mean, label="recovery_error", **config)
+    ax1.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+    x = grp["loss"]
+    mean = x.mean()
+    std = x.std()
+    config = next_config()
+    ax2.plot(mean.index, mean, label="loss", **config)
+    ax2.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+    plt.legend(loc="upper left")
+    plt.xlabel("noise")
+    ax1.set_ylabel("recovery error")
+    ax2.set_ylabel("loss")
+    plt.xticks(mean.index)
+    savefig()
+
+    mixture_min = df[df.noise_std == df.noise_std.min()].iloc[0].mixture
+    mixture_max = df[df.noise_std == df.noise_std.max()].iloc[0].mixture
+    print(mixture_min)
+    print(mixture_max)
+    import pdb; pdb.set_trace()
+
+
+@memoize
+def test_runtime(n, max_iter, seed=None):
+    import htinf
+    import htinfprev
+    mixture = create_graph(n, "complete", selfloops=True, random=True)
+    H_true = htinf.hitting_times(mixture)
+    htinf.ht_learn(H_true, max_iter=max_iter, return_time=True) # compile once
+    _, anal_time = htinf.ht_learn(H_true, max_iter=max_iter, return_time=True)
+    naive_time = 0 # htinf.time_htlearn_naive(H_true, max_iter=max_iter)
+    num_time = 0 # htinfprev.time_htlearn_numeric(H_true, max_iter=max_iter)
+    return {"anal_time": anal_time, "naive_time": naive_time, "num_time": num_time}
+
+def show_runtimes(setup, savefig=None):
+    df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
+    df = df.join(df.astype("object").apply(lambda row: test_runtime(row.n, row.max_iter, seed=row.seed),
+                  axis=1, result_type='expand'))
+
+    grp = df.groupby("n")
+    mean = grp.mean()
+    std = grp.std()
+
+    print(mean)
+    print(std)
 
 
 @memoize
@@ -67,9 +146,9 @@ def test_single_chain(n, graph_type, random, from_trails, n_trails, trail_len, m
         H_sample = H_true
         frob = 0
 
-    learned_mixture = htinf.ht_learn(H_sample, max_iter=max_iter)
+    learned_mixture, loss = htinf.ht_learn(H_sample, max_iter=max_iter, return_loss=True)
     tv = mixture.recovery_error(learned_mixture)
-    return {"tv": tv, "frob": frob}
+    return {"tv": tv, "frob": frob, "loss": loss}
 
 @genpath
 def plot_test_single_chain(setup, savefig=None):
@@ -77,16 +156,27 @@ def plot_test_single_chain(setup, savefig=None):
     df = df.join(df.astype("object").apply(lambda row: test_single_chain(row.n, row.graph_type, row.random, row.from_trails, row.n_trails, row.trail_len, max_iter=row.max_iter, seed=row.seed),
                   axis=1, result_type='expand'))
 
+    print(df)
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+
     grp = df.groupby("graph_type")
     for graph_type, df in grp:
         grp = df.groupby("n")
+
         x = grp["tv"]
         mean = x.mean()
         std = x.std()
-
         config = next_config()
-        plt.plot(mean.index, mean, label=graph_type, **config)
-        plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+        ax1.plot(mean.index, mean, label=graph_type, **config)
+        ax1.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+        x = grp["loss"]
+        mean = x.mean()
+        std = x.std()
+        config = next_config()
+        ax2.plot(mean.index, mean, label=graph_type, **config)
+        ax2.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
 
     plt.legend(loc="upper left")
     if setup['from_trails'][0]:
@@ -94,7 +184,8 @@ def plot_test_single_chain(setup, savefig=None):
     else:
         plt.title(f"estimation from true hitting times, {setup['max_iter'][0]} iterations")
     plt.xlabel("$n$")
-    plt.ylabel("TV-distance")
+    ax1.set_ylabel("recovery error")
+    ax2.set_ylabel("loss")
     plt.xticks(mean.index)
     savefig()
 
@@ -107,7 +198,7 @@ def test_ht_sampling(n, graph_type, random, n_trails, trail_len, seed=None):
     trails, _ = htinf.get_trails(mixture, n_trails, trail_len)
     H_sample = htinf.hitting_times_from_trails(n, trails)
     frob = np.linalg.norm(H_true - H_sample)
-    return {"frob": frob}
+    return {"frob": frob, "cover_time": np.max(H_true)}
 
 
 @genpath
@@ -115,6 +206,8 @@ def plot_test_ht_sampling(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
     df = df.join(df.astype("object").apply(lambda row: test_ht_sampling(row.n, row.graph_type, row.random, row.n_trails, row.trail_len, seed=row.seed),
                   axis=1, result_type='expand'))
+
+    title = f"{setup['graph_type'][0]} on {setup['n'][0]} vertices with cover time {df['cover_time'].iloc[0]:.1f}"
 
     grp = df.groupby(["n_trails", "trail_len"])
     x = grp["frob"]
@@ -138,14 +231,16 @@ def plot_test_ht_sampling(setup, savefig=None):
 
     ax.plot_surface(X, Y, Z, facecolors=rgb)
 
-    plt.title(setup['graph_type'][0])
+    plt.gca().invert_yaxis()
+
+    plt.title(title)
     savefig()
 
 
 @memoize
-def test_mixture_dt(n, k, n_trails, trail_len, num_iters=100, seed=None):
+def test_mixture_dt(n, k, n_trails, trail_len, num_iters=100, mix_type=None, seed=None):
     import htinf
-    mixture = dt.Mixture.random(n, k)
+    mixture = create_mixture_dt(n, k, mix_type) # dt.Mixture.random(n, k)
     mixture.S[:] = 1
     mixture.normalize()
     trails, _ = htinf.get_trails(mixture, n_trails, trail_len)
@@ -156,8 +251,8 @@ def test_mixture_dt(n, k, n_trails, trail_len, num_iters=100, seed=None):
 
 
 @memoize
-def test_mixture_dt_baseline(n, k, n_trails, trail_len, num_iters=100, seed=None):
-    mixture = dt.Mixture.random(n, k)
+def test_mixture_dt_baseline(n, k, n_trails, trail_len, num_iters=100, mix_type=None, seed=None):
+    mixture = create_mixture_dt(n, k, mix_type)# dt.Mixture.random(n, k)
     distribution = dt.Distribution.from_mixture(mixture, 3)
     sample = distribution.sample(n_trails * trail_len // 3)
     svd_learned_mixture = dt.svd_learn_new(sample, n, k)
@@ -172,8 +267,8 @@ def test_mixture_dt_baseline(n, k, n_trails, trail_len, num_iters=100, seed=None
 def plot_test_mixture_dt(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
     df = df.join(df.astype("object").apply(lambda row: {
-                      **test_mixture_dt(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed),
-                      **test_mixture_dt_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed)},
+                      **test_mixture_dt(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, mix_type=row.mix_type, seed=row.seed),
+                      **test_mixture_dt_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, mix_type=row.mix_type, seed=row.seed)},
                   axis=1, result_type='expand'))
     grp = df.groupby(["n"])
 
@@ -190,37 +285,64 @@ def plot_test_mixture_dt(setup, savefig=None):
     plt.xlabel("$n$")
     plt.ylabel("recovery error")
     plt.legend(loc="upper left")
-    plt.title(f"Learning {setup['k'][0]} chains from {setup['n_trails'][0]} trails of length {setup['trail_len'][0]}")
+    plt.title(f"Learning {setup['k'][0]} chains from {setup['n_trails'][0]} trails of length {setup['trail_len'][0]} ({setup['mix_type'][0]})")
     savefig()
 
 
 @memoize
 def test_mixture_ct(n, k, n_trails, trail_len, num_iters=100, seed=None):
+    mixture_dt = create_mixture_dt(n, k)
+    mixture_dt.S[:] = 1
+    mixture_dt.normalize()
+
+    mixture_ct = ct.Mixture(mixture_dt.S, np.array([M - np.eye(n) for M in mixture_dt.Ms]))
+
+    print(mixture_dt)
+    print(mixture_ct)
+
     import htinf
+    trails, _ = htinf.get_trails_ct(mixture_dt, n_trails, trail_len)
+
+    """
     mixture = ct.Mixture.random(n, k)
-    mixture.S[:] = 1
-    mixture.normalize()
-    trails, _ = htinf.get_trails_ct(mixture, n_trails, trail_len)
-    print(trails)
-    learned_mixture = htinf.em(n, k, trails, num_iters=num_iters)
-    recovery_error = mixture.recovery_error(learned_mixture)
+    print(mixture)
+    print(htinf.hitting_times_ct(mixture))
+    """
+
+    learned_mixture = htinf.em_ct(n, k, trails, num_iters=num_iters, learn_start=False)
+    recovery_error = mixture_ct.recovery_error(learned_mixture)
+    print(mixture_ct)
+    print(learned_mixture)
+    print("recovery_error=", recovery_error)
+    # print(htinf.hitting_times_ct(mixture))
+    # print(htinf.hitting_times_ct(learned_mixture))
     return {"recovery_error": recovery_error}
 
+
+@memoize
+def test_mixture_ct_baseline(n, k, n_trails, trail_len, num_iters=100, seed=None):
+    return test_methods_with_baseline_ct(n, k, 0.1, trail_len, n_trails, seed=seed)
 
 @genpath
 def plot_test_mixture_ct(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
-    df = df.join(df.astype("object").apply(lambda row: test_mixture_ct(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed),
+    df = df.join(df.astype("object").apply(lambda row: {
+                      **test_mixture_ct(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed),
+                      **test_mixture_ct_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed)},
                   axis=1, result_type='expand'))
 
+    # import pdb; pdb.set_trace()
+    print(df.columns)
     grp = df.groupby(["n"])
-    x = grp["recovery_error"]
-    mean = x.mean()
-    std = x.std()
 
-    config = next_config()
-    plt.plot(mean.index, mean, label=f"EM {setup['num_iters'][0]} iterations", **config)
-    plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+    for grp_name, label in [("recovery_error", f"HT-EM {setup['num_iters'][0]} iterations"), ("continuous_em_recovery_error", "cont-EM"), ("kausik_recovery_error", "disc-kausik"), ("em_recovery_error", "disc-EM"), ("svd_recovery_error", "disc-svd")]:
+        print(grp_name)
+        x = grp[grp_name]
+        mean = x.mean()
+        std = x.std()
+        config = next_config()
+        plt.plot(mean.index, mean, label=label, **config)
+        plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
 
     plt.xlabel("$n$")
     plt.ylabel("recovery error")
@@ -272,11 +394,13 @@ def nba_print_mixture(mixture, state_dict, trails_ct=None):
 
     real_players = ["PG", "SG", "PF", "SF", "C"]
     baskets = ["miss", "score"]
+    missing_ix = [i for i, x in state_dict.items() if x == "?"][0]
     for s, K in zip(mixture.S, mixture.Ks):
         print("\n\n")
         for i1, p1 in state_dict.items():
             if p1 not in real_players: continue
-            print("    \\node[label={[label distance=6pt]" + ("below" if p1 in ["PF", "SF"] else "above") + ":{" + f"{-10 * K[i1,i1]:.1f}" + "s}}] at (" + p1 + ") {};")
+            rate = -1 / (K[i1,i1] + K[i1, missing_ix])
+            print("    \\node[label={[label distance=6pt]" + ("below" if p1 in ["PF", "SF"] else "above") + ":{" + f"{rate:.1f}" + "s}}] at (" + p1 + ") {};")
             if s[i1] == max(s):
                 print("    \\node[start] at (" + p1 + ") {};")
             for i2, p2 in state_dict.items():
@@ -285,6 +409,11 @@ def nba_print_mixture(mixture, state_dict, trails_ct=None):
                     if (p2 in real_players and x < 0.2) or (p2 in baskets and x < 0.15): continue
                     color = ("," + {"score": "green", "miss": "red"}[p2]) if p2 in baskets else ""
                     print("    \\draw[pass,opacity=" + str(x) + ",line width=" + str(x * 10) + "pt" + color + "] (" + p1 + ") to (" + p2 + ");")
+
+
+@memoize
+def nba_learn_mixture(k, team, season, max_trail_time=20, min_trail_time=10, test_size=0.25, use_position=True, seed=0, num_iters=100, verbose=True):
+    pass
 
 
 # @memoize
@@ -308,12 +437,12 @@ def nba_ht(k, team, season, max_trail_time=20, min_trail_time=10, test_size=0.25
 
     df, state_dict = nba.load_trails(team, season, tau=1, model_score=True, verbose=verbose, use_position=True, max_trail_time=max_trail_time, min_trail_time=min_trail_time)
     n = len(state_dict)
-    trails = [row.trail_ct + [(1 if row.ptsScored > 0 else 0, 1)] for _, row in df.iterrows()]
+    # trails = [row.trail_ct + [(1 if row.ptsScored > 0 else 0, 1)] for _, row in df.iterrows()]
     trails = []
     for _, row in df.iterrows():
         trail = row.trail_ct
         final_state = 1 if row.ptsScored > 0 else 0
-        last_player = trail[-1][0]
+        last_player = np.random.randint(n) # trail[-1][0]
         trail = trail + [(final_state, 1), (last_player, 1)]
         trails.append([(u+1, t) for (u,t) in trail])
 
@@ -324,13 +453,15 @@ def nba_ht(k, team, season, max_trail_time=20, min_trail_time=10, test_size=0.25
     # H = htinf.hitting_times_from_trails_ct(n, trails)
     # print(H)
 
-    mixture_dt = htinf.em_ct(n, k, trails, num_iters=num_iters)
+    mixture = htinf.em_ct(n, k, trails, num_iters=num_iters)
 
+    """
     Ks = np.copy(mixture_dt.Ms)
     for i in range(k):
         Ks[i] -= np.eye(n)
     mixture = ct.Mixture(mixture_dt.S, Ks)
     print(mixture)
+    """
 
     # mixture = ct.Mixture.random(n, k)
 
@@ -454,4 +585,158 @@ def plot_test_msnbc_dt(setup, savefig=None):
     plt.legend(loc="upper left")
     plt.title(f"MSNBC")
     savefig()
+
+
+
+
+
+
+def clustering_error(x, y, use_max=False):
+    if use_max:
+        n = len(x)
+        x = np.argmax(x, axis=0)[None, :] == np.arange(n)[:, None]
+        y = np.argmax(y, axis=0)[None, :] == np.arange(n)[:, None]
+        # y = y == np.max(y, axis=0)[None, :]
+        # x = x == np.max(x, axis=0)[None, :]
+    dists = np.mean(np.abs(x.astype(float)[None, :, :] - y.astype(float)[:, None, :]), axis=2)
+    row_ind, col_ind = linear_sum_assignment(dists)
+    return np.sum(dists[row_ind, col_ind]) / 2
+
+def gen_example(n, L, tau, t_len, n_samples):
+    mixture = ct.Mixture.random(n, L)
+    trails, chains = mixture.sample(n_samples=n_samples, t_len=t_len, tau=tau, return_chains=True)
+    groundtruth = chains[None, :] == np.arange(L)[:, None]
+    return mixture, trails, groundtruth
+
+@memoize
+def test_methods_ct(n, L, tau, t_len, n_samples, seed=None):
+    print(">> gen_example")
+    mixture, trails, groundtruth = gen_example(n, L, tau, t_len, n_samples)
+
+    kausik_start_time = time.time()
+    print(">> kausik_learn")
+    if n < 8:
+        kausik_mixture_ct, labels, kausik_mle_time = ct.kausik_learn(n, L, trails, tau, return_labels=True, return_time=True)
+        kausik_time = time.time() - kausik_start_time
+        kausik_lls = labels[None, :] == np.arange(L)[:, None]
+        kausik_mixture_dt = dt.mle(n, trails, kausik_lls)
+        kausik_recovery_error = mixture.recovery_error(kausik_mixture_ct)
+        kausik_clustering_error = clustering_error(groundtruth, kausik_lls)
+    else:
+        kausik_mixture_ct = None
+        kausik_mixture_dt = None
+        kausik_lls = None
+        kausik_recovery_error = None
+        kausik_clustering_error = None
+        kausik_time = None
+        kausik_mle_time = None
+
+    em_start_time = time.time()
+    print(">> em_learn")
+    em_mixture_dt = dt.em_learn(n, L, trails)
+    em_lls = dt.likelihood(em_mixture_dt, trails)
+    em_mle_start_time = time.time()
+    em_mixture_ct = ct.mle_prior(em_lls, n, trails, tau=tau)
+    em_mle_time = time.time() - em_mle_start_time
+    em_time = time.time() - em_start_time
+
+    svd_mixture_dt = None
+    svd_mixture_ct = None
+    svd_lls = None
+    svd_time = None
+    svd_mle_time = None
+
+    print(">> Distribution.from_trails")
+    sample = dt.Distribution.from_trails(n, trails)
+    svd_start_time = time.time()
+    print(">> svd_learn")
+    svd_mixture_dt = dt.svd_learn(sample, n, L)
+    svd_lls = dt.likelihood(svd_mixture_dt, trails)
+    svd_mle_start_time = time.time()
+    svd_mixture_ct = ct.mle_prior(svd_lls, n, trails, tau=tau)
+    svd_mle_time = time.time() - svd_mle_start_time
+    svd_time = time.time() - svd_start_time
+
+    print("<< done")
+    return {
+        'mixture': mixture,
+        'trails': trails,
+        'groundtruth': groundtruth,
+
+        'kausik_mixture_ct': kausik_mixture_ct,
+        'kausik_mixture_dt': kausik_mixture_dt,
+        'kausik_lls': kausik_lls,
+        'kausik_recovery_error': kausik_recovery_error,
+        'kausik_clustering_error': kausik_clustering_error,
+
+        'em_mixture_ct': em_mixture_ct,
+        'em_mixture_dt': em_mixture_dt,
+        'em_lls': em_lls,
+        'em_recovery_error': mixture.recovery_error(em_mixture_ct),
+        'em_clustering_error': clustering_error(groundtruth, em_lls),
+
+        'svd_mixture_ct': svd_mixture_ct,
+        'svd_mixture_dt': svd_mixture_dt,
+        'svd_lls': svd_lls,
+        'svd_recovery_error': None if svd_mixture_ct is None else mixture.recovery_error(svd_mixture_ct),
+        'svd_clustering_error': None if svd_lls is None else clustering_error(groundtruth, svd_lls),
+
+        'kausik_time': kausik_time,
+        'kausik_mle_time': kausik_mle_time,
+        'em_time': em_time,
+        'em_mle_time': em_mle_time,
+        'svd_time': svd_time,
+        'svd_mle_time': svd_mle_time,
+    }
+
+@memoize
+def test_baseline_ct(n, L, tau, t_len, n_samples, seed=None):
+    if n < 8:
+        print(">> gen_example")
+        mixture, trails, groundtruth = gen_example(n, L, tau, 1 + int(t_len), n_samples)
+        duration = t_len * tau
+        print(">> sample_ct")
+        trails_ct = mixture.sample_ct(n_samples, duration)
+
+        continuous_em_start_time = time.time()
+        print(">> continuous_em_learn")
+        continuous_em_mixture = ct.continuous_em_learn(n, L, trails_ct)
+        print("<< done")
+        continuous_em_time = time.time() - continuous_em_start_time
+        continuous_em_lls = ct.likelihood(continuous_em_mixture, trails_ct)
+
+        return {
+            'mixture': mixture,
+            'trails': trails,
+            'groundtruth': groundtruth,
+
+            'continuous_em_mixture': continuous_em_mixture,
+            'continuous_em_lls': continuous_em_lls,
+            'continuous_em_recovery_error': mixture.recovery_error(continuous_em_mixture),
+            'continuous_em_clustering_error': clustering_error(groundtruth, continuous_em_lls),
+            'continuous_em_time': continuous_em_time,
+        }
+
+    else:
+        return {
+            'mixture': None,
+            'trails': None,
+            'groundtruth': None,
+
+            'continuous_em_mixture': None,
+            'continuous_em_lls': None,
+            'continuous_em_recovery_error': None,
+            'continuous_em_clustering_error': None,
+            'continuous_em_time': None,
+        }
+
+def test_methods_with_baseline_ct(*args, **kwargs):
+    baseline = test_baseline_ct(*args, **kwargs)
+    methods = test_methods_ct(*args, **kwargs)
+    return {
+        **baseline,
+        **methods,
+    }
+
+    # (n, k, 0.1, trail_len, n_trails)
 

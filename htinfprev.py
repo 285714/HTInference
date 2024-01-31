@@ -54,6 +54,7 @@ def hitting_times_Linv(Linv):
     return hitting_times_Linv_sfix(Linv, s)
 
 def hitting_times_Linv_sfix(Linv, s):
+    n, _ = Linv.shape
     X = np.eye(n)[:, None, :] - np.eye(n)[None, :, :]
     S = 1 - np.eye(n) / s[:, None]
     H = np.einsum("ib,ij,abj->ab", S, Linv, X)
@@ -72,6 +73,7 @@ def rk1_update(Linv, u, v, eps=0.1):
     return Linv
 
 def numeric_grad(loss, Linv, eps=1e-12):
+    n, _ = Linv.shape
     dLinv = np.zeros_like(Linv)
     loss0 = loss(Linv)
     d = np.zeros_like(Linv)
@@ -99,6 +101,7 @@ def stationary_Linv2(Linv):
     return s
 
 def stationary_Linv(Linv):
+    n, _ = Linv.shape
     L = np.linalg.pinv(Linv, rcond=1e-10)
     p = Linv @ L @ np.ones(n)
     # p, _, _, _ = np.linalg.lstsq(Linv, np.ones(n), rcond=None)
@@ -178,6 +181,7 @@ def sm_update_(A, c, d):
     import pdb; pdb.set_trace()
 
 def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=2000, loss_threshold=1e-3, verbose=False):
+    n, _ = X.shape
     loss_threshold_count = 0
     m = np.zeros_like(X)
     v = np.zeros_like(X)
@@ -189,7 +193,8 @@ def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=20
         m_hat = m / (1 - beta1)
         v_hat = v / (1 - beta2)
         dX = eta * m_hat / (np.sqrt(v_hat) + eps)
-        X -= dX
+
+        # X -= dX
 
         # projection:
 
@@ -199,8 +204,8 @@ def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=20
 
         # X[range(n), range(n)] -= np.sum(X, axis=1)
 
-        d = np.sum(X, axis=1)
-        X -= d[:, None] / n
+        # d = np.sum(X, axis=1)
+        # X -= d[:, None] / n
 
         l = loss(X)
         if l < loss_threshold: loss_threshold_count += 1
@@ -219,45 +224,8 @@ def adam(X, grad, loss, eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=20
 
 
 
-rnd =  rnd_stoch
-# rnd = rnd_euler
-# rnd = rnd_sym_stoch
-
-
-n = 50
-# M_true = rnd_sym_stoch(n)
-M_true = rnd(n)
-
-H_true = hitting_times(M_true)
-s_true = stationary(M_true)
-L_true = np.eye(n) - M_true.T
-Linv_true = np.linalg.pinv(L_true)
-
-
-# M = rnd_sym_stoch(n)
-M = rnd(n)
-L = np.eye(n) - M.T
-Linv = np.linalg.pinv(L)
-
-
-# test rank-1 update to L:
-# X = L
-# X = np.random.random((n, n))
-# X = np.vstack((np.zeros(n), np.random.random((n, n-1)).T)).T
-# A = np.vstack((X, np.zeros(n)))
-# c = np.hstack((np.zeros(n), 1))
-# d = np.ones(n)
-# sm_update(A, c, d)
-# sm_update(L, np.ones(n), np.ones(n))
-# sm_update_one(L)
-
-
-# loss = lambda Linv: hitting_times_loss_sfix(H_true, Linv, s_true)
-# grad = lambda Linv: grad_Linv_sfix(H_true, Linv, s_true)
-
-
-def time_htinf_numeric(H_true, max_iter)
-    n, _ = Linv.shape
+def time_htlearn_numeric(H_true, max_iter=10000):
+    n, _ = H_true.shape
     loss = lambda Linv: hitting_times_loss(H_true, Linv)
     grad = lambda Linv: numeric_grad(loss, Linv)
 

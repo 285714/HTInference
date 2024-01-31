@@ -5,8 +5,18 @@ import Graphs
 using LinearAlgebra
 import StatsBase
 using Printf
+import Hungarian
 
 
+
+function distance(m1, m2)
+    @assert size(m1.start) == size(m2.start)
+    n, k = size(m1.start)
+    D = reshape(m1.trans, (n, n, k, 1)) .- reshape(m2.trans, (n, n, 1, k))
+    W = dropdims(sum(abs.(D), dims=(1, 2)), dims=(1, 2))
+    _, dist = Hungarian.hungarian(W)
+    dist / (2 * n * k)
+end
 
 function to_mixture(ss, ts)
     start = cat(ss..., dims=2)
@@ -231,10 +241,12 @@ end
 function adam(Linv, loss_grad; eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_iter=10000, loss_threshold=1e-5, verbose=false, return_loss=false)
     n, _ = size(Linv)
 
+    """
     if verbose
         println("\n[ADAM] Init")
         display(transpose(I - pinv(Linv)))
     end
+    """
 
     loss_threshold_count = 0
     m = zeros(size(Linv))
@@ -266,7 +278,7 @@ function adam(Linv, loss_grad; eta=1e-3, eps=1e-10, beta1=0.9, beta2=0.999, max_
         end
         if loss_threshold_count >= 10 break end
 
-        if verbose && (i % 100 == 0 || i == 1)
+        if verbose && (i % 10000 == 0 || i == 1)
             M = I - transpose(L)
             println("\n[ADAM] Iteration ", i, ": loss=", l, " num-err=", sum(abs.(sum(Linv, dims=2))))
             # display(M)
@@ -311,7 +323,8 @@ function ht_learn(H_true; max_iter=10000, verbose=true, return_loss=false, retur
         Linv, loss = adam(
             initial_guess(H_true),
             (Linv, L) -> grad_loss_faster(Linv, L, H_true);
-            eta=1e-6,
+            eta=1e-4,
+            beta1=0.99,
             verbose=verbose,
             max_iter=max_iter,
             return_loss=true)
@@ -409,11 +422,16 @@ function learn_start_ct(n, trails, weights)
 end
 
 
-function em(n, k, trails; num_iters=100, m_true=nothing, verbose=false,
+function em(n, k, trails; num_iters=100, m_true=nothing, verbose=true,
                rel_likelihood=rel_likelihood, hitting_times=hitting_times,
                learn_start=learn_start)
+    if trails isa Matrix
+        trails = [trails[i, :] for i in 1:size(trails,1)]
+    end
+    println("learn_start=", learn_start)
+
     m = Mixtures.random(n, k)
-    m.start[:] .= 1 / n
+    m.start[:] .= 1 / (n * k)
     for iter in 1:num_iters
         ll = rel_likelihood(m, trails)
 
@@ -421,28 +439,95 @@ function em(n, k, trails; num_iters=100, m_true=nothing, verbose=false,
             hitting_times(n, trails, ll[:, i])
         end
 
+        losses = []
         map(1:k) do i
-            m.start[:, i] = learn_start(n, trails, ll[:, i])
-            m.trans[:, :, i] = ht_learn(Hs[i])
+            if !(learn_start isa Bool)
+                m.start[:, i] = learn_start(n, trails, ll[:, i])
+            end
+            m.trans[:, :, i], l = ht_learn(Hs[i], return_loss=true, verbose=false)
+            push!(losses, l)
         end
 
         m.trans .= abs.(m.trans)
         m.trans ./= sum(m.trans, dims=2)
 
         if verbose
-            println("\n\n[EM] Iteration ", iter)
+            println("\n\n[EM] Iteration ", iter, " losses=", losses)
             if !isnothing(m_true)
-                println("distance=", Mixtures.distance(m, m_true))
+                println("distance=", distance(m, m_true))
             end
-            display(m.trans)
+            # display(m.trans)
         end
     end
     m
 end
 
-function em_ct(n, k, trails; num_iters=100, m_true=nothing, verbose=false)
-    em(n, k, trails; num_iters=100, m_true=m_true, verbose=verbose, rel_likelihood=rel_likelihood_ct, hitting_times=hitting_times_ct, learn_start=learn_start_ct)
+function em_ct(n, k, trails; num_iters=100, m_true=nothing, verbose=true, learn_start=learn_start_ct)
+    em(n, k, trails; num_iters=num_iters, m_true=m_true, verbose=verbose, rel_likelihood=rel_likelihood_ct, hitting_times=hitting_times_ct, learn_start=learn_start)
 end
+
+
+
+function grad_loss_naive(Linv, L, H_train)
+    n, _ = size(Linv)
+    H = hitting_times(Linv, L)
+    s = stationary(Linv, L)
+    ds = grad_s(Linv)
+
+    dH = zeros(n, n, n, n)
+    dloss = zeros(n, n)
+    for i in 1:n
+        for j in 1:n
+            if i == j continue end
+            for u in 1:n
+                for v in 1:n
+                    if u == v continue end
+
+                    x = (j == u) + (i == v) - (i == u) - (j == v)
+                    a = x - (v == i ? x / s[v] : 0)
+                    b = ds[i, j, v] * (Linv[v, u] - Linv[v, v]) / s[v]^2
+                    dH[i, j, u, v] = a + b
+
+                    dloss[i, j] += dH[i, j, u, v] * (H[u, v] - H_train[u, v])
+                end
+            end
+        end
+    end
+    Inf, dloss
+end
+
+function grad_s(Linv)
+    numeric_grad(stationary, Linv)
+end
+
+function numeric_grad(loss, Linv, eps=1e-10)
+    n, _ = size(Linv)
+    loss0 = loss(Linv)
+    dLinv = Array{Float64}(undef, size(Linv)..., size(loss0)...)
+    d = zeros(n, n)
+    for i = 1:n
+        for j = 1:n
+            d[i, j] += eps
+            d[i, i] -= eps
+            dLinv[i, j, CartesianIndices(loss0)] = loss(Linv + d) - loss0
+            d[i, j] -= eps
+            d[i, i] += eps
+        end
+    end
+    dLinv ./ eps
+end
+
+function time_htlearn_naive(H_true; max_iter=10000)
+    time = @elapsed begin
+        adam(
+            initial_guess(H_true),
+            (Linv, L) -> grad_loss_naive(Linv, L, H_true);
+            verbose=false,
+            max_iter=max_iter)
+    end
+    return time
+end
+
 
 
 end

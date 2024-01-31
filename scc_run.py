@@ -6,6 +6,71 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()
 
 
+
+    """
+    plot_test_mixture_dt({
+        "n": np.linspace(3, 10, 9, dtype=int),
+        "k": [2],
+        "mix_type": ["stargrid"],
+        "n_trails": [1000],
+        "trail_len": [1000],
+        "num_iters": [100],
+        "seed": range(5, 10),
+    })
+    """
+
+
+    """
+    plot_test_mixture_ct({
+        "n": np.linspace(2, 7, 6, dtype=int),
+        "k": [2],
+        "n_trails": [5000],
+        "trail_len": [1000],
+        "num_iters": [20],
+        "seed": range(20, 25),
+    })
+    """
+
+    plot_test_mixture_ct({
+        "n": np.linspace(2, 10, 9, dtype=int),
+        "k": [2],
+        "n_trails": [5000],
+        "trail_len": [1000],
+        "num_iters": [20],
+        "seed": range(20, 25),
+    })
+
+    """
+    plot_test_mixture_ct({
+        "n": np.linspace(2, 10, 9, dtype=int),
+        "k": [2],
+        "n_trails": [1000],
+        "trail_len": [1000],
+        "num_iters": [20],
+        "seed": range(20, 25),
+    })
+
+    plot_test_mixture_ct({
+        "n": np.linspace(2, 10, 9, dtype=int),
+        "k": [2],
+        "n_trails": [10000],
+        "trail_len": [1000],
+        "num_iters": [100],
+        "seed": range(20, 25),
+    })
+
+    plot_test_mixture_ct({
+        "n": np.linspace(2, 10, 9, dtype=int),
+        "k": [2],
+        "n_trails": [10000],
+        "trail_len": [1000],
+        "num_iters": [100],
+        "seed": range(20, 25),
+    })
+    """
+
+
+
     # test_msnbc_dt(17, 5, "CA-SVD-EM2", num_iters=100, seed=None)
 
     """
@@ -19,10 +84,66 @@ if __name__ == '__main__':
     """
 
 
-    test_grid(25, max_iter=1000000)
+    # test_grid(49, max_iter=100000)
+
+    """
+    plot_test_grid({
+        "n": [25], # 16
+        "max_iter": [100000],
+#       "noise_std": [0, 0.01, 0.05, 0.1, 0.2],
+        "noise_std": [0, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+        "seed": range(5),
+    })
+    """
+
+    # print(test_runtime(5, max_iter=1000))
+
+    """
+    show_runtimes({
+        "n": [5, 20, 50],
+        "max_iter": [1000],
+        "seed": range(5, 10),
+    })
+    """
 
 
     # nba_ht(2, "NYK", 2022, num_iters=100)
+
+
+    """
+    plot_test_single_chain({
+        "n": np.linspace(20, 500, 5, dtype=int),
+        "graph_type": ["complete"],
+        "random": [True],
+        "from_trails": [False],
+        "n_trails": [10000],
+        "trail_len": [10000],
+        "max_iter": [10000],
+        "seed": range(10, 11),
+    })
+
+    plot_test_single_chain({
+        "n": np.linspace(20, 500, 5, dtype=int),
+        "graph_type": ["complete"],
+        "random": [True],
+        "from_trails": [False],
+        "n_trails": [10000],
+        "trail_len": [10000],
+        "max_iter": [50000],
+        "seed": range(10, 11),
+    })
+
+    plot_test_single_chain({
+        "n": np.linspace(20, 500, 10, dtype=int),
+        "graph_type": ["complete"],
+        "random": [True],
+        "from_trails": [False],
+        "n_trails": [10000],
+        "trail_len": [10000],
+        "max_iter": [10000],
+        "seed": range(10, 11),
+    })
+    """
 
     """
     plot_test_single_chain({
@@ -33,7 +154,21 @@ if __name__ == '__main__':
         "n_trails": [10000],
         "trail_len": [10000],
         "max_iter": [10000],
-        "seed": range(6, 7),
+        "seed": range(10, 15),
+    })
+    """
+
+
+    """
+    plot_test_single_chain({
+        "n": [20, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500], # np.linspace(20, 1000, 20, dtype=int),
+        "graph_type": ["complete"],
+        "random": [True],
+        "from_trails": [False],
+        "n_trails": [10000],
+        "trail_len": [10000],
+        "max_iter": [10000],
+        "seed": range(15, 20),
     })
     """
 

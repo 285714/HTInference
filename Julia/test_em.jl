@@ -2,7 +2,7 @@ include("ht-inf.jl")
 using LinearAlgebra
 
 
-n = 3
+n = 100
 k = 1
 
 m = HtInf.Mixtures.random(n, k)
@@ -20,12 +20,15 @@ display(H)
 # println("\n\ntrails")
 # println(trails)
 
+HtInf.time_htlearn_naive(H)
+
 """
 println("\n\nEstimated HT")
 H_est = HtInf.hitting_times2(n, trails)
 display(H_est)
 """
 
+"""
 m_ = HtInf.em(n, k, trails, num_iters=100, verbose=false)
 
 println("\n\nLearned Mixture:")
@@ -34,4 +37,5 @@ println("\n\nTrue Mixture:")
 display(m)
 
 println("\n\nerror=", HtInf.Mixtures.distance(m, m_))
+"""
 
