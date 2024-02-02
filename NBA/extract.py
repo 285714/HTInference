@@ -120,8 +120,11 @@ def discretize(df, tau, max_trail_time=20, min_trail_time=10, model_score=False,
     for trail in df.trail:
         for x in trail:
             player = get_player(x)
+            if player == "?": continue
             if player not in player_ids:
                 player_ids[player] = len(player_ids)
+
+    print(player_ids)
 
     target_len = int(math.floor(MAX_TRAIL_TIME // tau) + 1)
 
@@ -139,6 +142,7 @@ def discretize(df, tau, max_trail_time=20, min_trail_time=10, model_score=False,
             if math.isnan(transition_time): continue
             # if transition_time < 1e-10: break
             total_time += transition_time
+            if get_player(x) == "?": continue
             player = player_ids[get_player(x)]
             trail_ct.append((player, transition_time))
             while time < total_time:
