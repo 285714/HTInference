@@ -198,7 +198,7 @@ def plot_test_grid(setup, savefig=None):
                   axis=1, result_type='expand'))
 
     grp = df.groupby("noise_std")
-    fig, ax1 = plt.subplots(figsize=(6.1, 3.8))
+    fig, ax1 = plt.subplots() # figsize=(6.1, 3.8)
     ax2 = ax1.twinx()
 
     x = grp["tv"]
@@ -280,7 +280,7 @@ def plot_test_single_chain(setup, savefig=None):
 
     # plt.figure()
     # print(df)
-    fig, ax1 = plt.subplots(figsize=(6.1, 3.4))
+    fig, ax1 = plt.subplots() # figsize=(6.1, 3.4)
     ax2 = ax1.twinx()
 
     grp = df.groupby("graph_type")
@@ -293,7 +293,7 @@ def plot_test_single_chain(setup, savefig=None):
         config = next_config()
         ax1.plot(mean.index, mean, label="recovery error", **config)
         ax1.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
-        ax1.set_ylim(bottom=0, top=0.15)
+        ax1.set_ylim(bottom=-0.005, top=0.155)
 
         x = grp["loss"]
         mean = x.mean()
@@ -301,7 +301,7 @@ def plot_test_single_chain(setup, savefig=None):
         config = next_config()
         ax2.plot(mean.index, mean, label="loss", **config)
         ax2.fill_between(mean.index, mean - std, mean + std, alpha=0.2, color=config["color"])
-        ax2.set_ylim(bottom=0, top=400000)
+        ax2.set_ylim(bottom=-13300, top=413300)
 
     ax1.legend(loc="upper left")
     ax2.legend(loc="upper right")
@@ -338,6 +338,8 @@ def plot_test_ht_sampling(setup, savefig=None):
     # title = f"{setup['graph_type'][0]} on {setup['n'][0]} vertices with cover time {df['cover_time'].iloc[0]:.1f}"
     title = graph_names[setup['graph_type'][0]]
 
+    # plt.figure(figsize=(3.4, 3.4))
+
     grp = df.groupby(["n_trails", "trail_len"])
     x = grp["frob"]
     mean = x.mean()
@@ -352,7 +354,7 @@ def plot_test_ht_sampling(setup, savefig=None):
     from matplotlib.colors import LightSource
     ls = LightSource(270, 45)
     rgb = ls.shade(Z, cmap=cm.gist_earth, vert_exag=0.1, blend_mode='soft')
-    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'))
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'), figsize=(3.4, 3.4))
 
     ax.set_xlabel('number of trails')
     ax.set_ylabel('trail length', linespacing=2)
@@ -398,11 +400,12 @@ def plot_test_mixture_dt(setup, savefig=None):
     kwargs = {"mix_type": setup["mix_type"][0]} if "mix_type" in setup else {}
     df = df.join(df.astype("object").apply(lambda row: {
                       **test_mixture_dt(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, **kwargs, seed=row.seed),
-                      **test_mixture_dt_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, **kwargs, seed=row.seed)},
+                      # **test_mixture_dt_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, **kwargs, seed=row.seed)
+                      },
                   axis=1, result_type='expand'))
     grp = df.groupby(["n"])
 
-    plt.figure(figsize=(6.1, 3.8))
+    # plt.figure(figsize=(6.1, 3.8))
 
     for grp_name, label in [("recovery_error", f"ULTRA-MC"),
                             ("svd_recovery_error", "SVD (discrete)"),
@@ -415,7 +418,7 @@ def plot_test_mixture_dt(setup, savefig=None):
         plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
 
     plt.xticks(mean.index)
-    plt.ylim(bottom=0)
+    plt.ylim(bottom=-0.007, top=0.257)
     plt.xlabel("number of states $n$")
     plt.ylabel("recovery error")
     plt.legend(loc="upper left")
@@ -462,15 +465,16 @@ def plot_test_mixture_ct(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
     df = df.join(df.astype("object").apply(lambda row: {
                       **test_mixture_ct(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed),
-                      **test_mixture_ct_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed)},
+                      # **test_mixture_ct_baseline(row.n, row.k, row.n_trails, row.trail_len, num_iters=row.num_iters, seed=row.seed)
+                      },
                   axis=1, result_type='expand'))
 
     # import pdb; pdb.set_trace()
     print(df.columns)
     grp = df.groupby(["n"])
-    plt.figure(figsize=(6.1, 3.8))
+    # plt.figure(figsize=(6.1, 3.8))
 
-    for grp_name, label in [("recovery_error", f"ULTRA-MC"), ("continuous_em_recovery_error", "EM (continuous)"), ("kausik_recovery_error", "KTT (discretized)"), ("em_recovery_error", "EM (discretized)"), ("svd_recovery_error", "SVD (discretized)")]:
+    for grp_name, label in [("recovery_error", f"ULTRA-MC")]: # , ("continuous_em_recovery_error", "EM (continuous)"), ("kausik_recovery_error", "KTT (discretized)"), ("em_recovery_error", "EM (discretized)"), ("svd_recovery_error", "SVD (discretized)")]:
         print(grp_name)
         x = grp[grp_name]
         mean = x.mean()
@@ -479,7 +483,7 @@ def plot_test_mixture_ct(setup, savefig=None):
         plt.plot(mean.index, mean, label=label, **config)
         plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
 
-    plt.ylim(bottom=0)
+    plt.ylim(bottom=-0.01, top=0.41)
     plt.xticks(mean.index)
     plt.xlabel("number of states $n$")
     plt.ylabel("recovery error")

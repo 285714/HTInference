@@ -5,7 +5,15 @@ import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
-    nba_ht(6, "BOS", 2022, num_iters=100)
+    # nba_ht(3, "DEN", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "GSW", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "LAL", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "BOS", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "MIA", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "LAC", 2022, num_iters=100, max_trail_time=20)
+    # nba_ht(3, "HOU", 2022, num_iters=100, max_trail_time=20)
+
+    # ["GSW", "LAL", "BOS", "MIA", "LAC", "HOU"]
 
     """
     n = 5
@@ -28,43 +36,41 @@ if __name__ == '__main__':
     """
 
 
-    """
     f = 4
 
-    plot_test_ht_sampling({ # CT = 10
-        "n": [10],
+    plot_test_ht_sampling({
+        "n": [16],
         "graph_type": ["complete"],
         "random": [False],
         "n_trails": np.linspace(10, 100, 10, dtype=int),
-        "trail_len": np.linspace(5, f*10, 10, dtype=int),
+        "trail_len": np.linspace(5, f*16, 10, dtype=int),
         "seed": range(10, 15),
     })
 
-    plot_test_ht_sampling({ # CT = 165
-        "n": [10],
+    plot_test_ht_sampling({
+        "n": [16],
         "graph_type": ["lollipop"],
         "random": [False],
         "n_trails": np.linspace(10, 100, 10, dtype=int),
-        "trail_len": np.linspace(5, f*165, 10, dtype=int),
-        "seed": range(5, 10),
+        "trail_len": np.linspace(5, f*612, 10, dtype=int),
+        "seed": range(10, 15),
     })
 
-    plot_test_ht_sampling({ # CT = 28
-        "n": [10],
+    plot_test_ht_sampling({
+        "n": [16],
         "graph_type": ["star"],
         "random": [False],
         "n_trails": np.linspace(10, 100, 10, dtype=int),
-        "trail_len": np.linspace(100, f*28, 10, dtype=int),
-        "seed": range(5, 10),
+        "trail_len": np.linspace(100, f*46, 10, dtype=int),
+        "seed": range(10, 15),
     })
 
-    plot_test_ht_sampling({ # CT = 40
-        "n": [10],
+    plot_test_ht_sampling({
+        "n": [16],
         "graph_type": ["grid"],
         "random": [False],
         "n_trails": np.linspace(10, 100, 10, dtype=int),
-        "trail_len": np.linspace(100, f*40, 10, dtype=int),
-        "seed": range(5, 10),
+        "trail_len": np.linspace(100, f*60, 10, dtype=int), # 59.4
+        "seed": range(10, 15),
     })
-    """
 
