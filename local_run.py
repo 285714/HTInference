@@ -5,7 +5,11 @@ import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
-    nba_ht(6, "BOS", 2022, num_iters=100)
+
+    test_halyman(4, 2)
+
+
+    # nba_ht(6, "BOS", 2022, num_iters=100)
 
     """
     n = 5

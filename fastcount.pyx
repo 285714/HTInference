@@ -15,6 +15,17 @@ def transitions(n, trails):
     return c
 
 
+def transitions_ct(n, trails_ct, weights=None):
+    num_trails = len(trails_ct)
+    if weights is None: weights = np.ones((1, num_trails))
+    L, _ = weights.shape
+    cdef np.ndarray c = np.zeros([n, n, L])
+    for trail, w in zip(trails_ct, weights.T):
+        for (i, _), (j, _) in zip(trail[:-1], trail[1:]):
+            c[i, j, :] += w
+    return c
+
+
 def avg_transition_time(n, trails):
     n_samples, _ = trails.shape
     cdef np.ndarray sum_ttime = np.zeros([n_samples, n], dtype=int)
