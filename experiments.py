@@ -1030,5 +1030,4 @@ def plot_test_wittmann(setup, savefig=None):
     plt.legend()
     savefig()
 
->>>>>>> 264d04869e20fdeb65004169f603b23a3b3f5f96
 
