@@ -367,7 +367,7 @@ def likelihood(mixture, trails_ct):
     """
 
 
-def mle_ct_single_chain(n, trails, trail_weights=None):
+def mle_ct_single_chain(n, trails, trail_weights=None, return_stats=False):
     if trail_weights is None: trail_weights = np.ones(len(trails))
     holding_times = [[1] for _ in range(n)]
     holding_time_weights = [[1e-10] for _ in range(n)]
@@ -381,6 +381,9 @@ def mle_ct_single_chain(n, trails, trail_weights=None):
     holding_diag = np.array([1 / np.average(ts, weights=ws) for ts, ws in zip(holding_times, holding_time_weights)])
     transition_prob = n_transitions / np.sum(n_transitions, axis=1)[:, None]
     transition_prob[range(n), range(n)] = -1
+
+    if return_stats:
+        return holding_diag, transition_prob
 
     K = holding_diag[:, None] * transition_prob
     starting_states, starting_state_counts = np.unique([trail[0][0] for trail in trails], return_counts=True)
@@ -412,4 +415,34 @@ def continuous_em_learn(n, L, trails_ct, max_iter=100, init=None):
     # print("Time spent on likelihood: ", time_lls)
     # print("Time spent on MLE: ", time_mle)
     return mixture
+
+
+def continuous_em_frydman(n, L, trails_ct, max_iter=100, init=None):
+    mixture = Mixture.random(n, L) if init is None else init
+
+    # C0 = fastcount.transitions_ct(n, trails_ct)
+    # X0 = C0 / np.sum(C0, axis=1)[:, None]
+
+    for _ in range(max_iter):
+        log_lls = likelihood(mixture, trails_ct)
+        lls = np.exp(log_lls - np.max(log_lls, axis=0))
+        lls /= np.sum(lls, axis=0)[None, :]
+
+        # estimate Q
+        mixture = mle_ct_prior(lls, n, trails_ct)
+        Q = mixture.Ks[0]
+
+        C = fastcount.transitions_ct(n, trails_ct, lls)
+        X = np.sum(C, axis=1)
+        q = -np.diag(Q)
+
+        for l in range(1, L):
+            holding_diag, transition_prob = mle_ct_single_chain(n, trails_ct, trail_weights=lls[l], return_stats=True)
+            gamma = holding_diag / q
+            mixture.Ks[l] = gamma[:, None] * Q
+
+
+
+    return mixture
+
 

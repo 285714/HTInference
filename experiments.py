@@ -862,3 +862,25 @@ def test_methods_with_baseline_ct(*args, **kwargs):
 
     # (n, k, 0.1, trail_len, n_trails)
 
+
+def test_halyman(n, L, n_samples=100, duration=10, seed=None):
+    mixture = ct.Mixture.random(n, L)
+    Q = mixture.Ks[0]
+    print("Q=")
+    print(Q)
+    for i in range(1, L):
+        gamma = 2 * np.random.random(n)
+        mixture.Ks[i] = gamma[:, None] * Q
+        print(f"gamma[{i}]=")
+        print(gamma)
+        # print(f"A[{i}]=")
+        # print(mixture.Ks[i])
+
+    trails_ct = mixture.sample_ct(n_samples, duration)
+
+    learned_mixture = ct.continuous_em_frydman(n, L, trails_ct)
+    recovery_error = mixture.recovery_error(learned_mixture)
+    print(f"frydman recovery_error={recovery_error:.3f}")
+
+
+

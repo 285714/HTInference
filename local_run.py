@@ -5,7 +5,11 @@ import multiprocessing
 if __name__ == '__main__':
     multiprocessing.freeze_support()
 
-    # nba_ht(3, "DEN", 2022, num_iters=100, max_trail_time=20)
+    # test_halyman(4, 2)
+
+    # test_agg(4, 1)
+
+    nba_ht(6, "DEN", 2022, num_iters=100, max_trail_time=20)
     # nba_ht(3, "GSW", 2022, num_iters=100, max_trail_time=20)
     # nba_ht(3, "LAL", 2022, num_iters=100, max_trail_time=20)
     # nba_ht(3, "BOS", 2022, num_iters=100, max_trail_time=20)
@@ -14,6 +18,9 @@ if __name__ == '__main__':
     # nba_ht(3, "HOU", 2022, num_iters=100, max_trail_time=20)
 
     # ["GSW", "LAL", "BOS", "MIA", "LAC", "HOU"]
+
+
+    # nba_ht(6, "BOS", 2022, num_iters=100)
 
     """
     n = 5
@@ -36,6 +43,7 @@ if __name__ == '__main__':
     """
 
 
+    """
     f = 4
 
     plot_test_ht_sampling({
@@ -73,4 +81,5 @@ if __name__ == '__main__':
         "trail_len": np.linspace(100, f*60, 10, dtype=int), # 59.4
         "seed": range(10, 15),
     })
+    """
 
