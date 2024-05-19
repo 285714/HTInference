@@ -446,14 +446,17 @@ def test_mixture_ct(n, k, n_trails, trail_len, num_iters=100, seed=None):
     print(htinf.hitting_times_ct(mixture))
     """
 
+    start_time = time.time()
     learned_mixture = htinf.em_ct(n, k, trails, num_iters=num_iters, learn_start=False)
+    learn_time = time.time() - start_time
+
     recovery_error = mixture_ct.recovery_error(learned_mixture)
     print(mixture_ct)
     print(learned_mixture)
     print("recovery_error=", recovery_error)
     # print(htinf.hitting_times_ct(mixture))
     # print(htinf.hitting_times_ct(learned_mixture))
-    return {"recovery_error": recovery_error}
+    return {"recovery_error": recovery_error, "time": learn_time}
 
 
 @memoize
@@ -469,7 +472,7 @@ def plot_test_mixture_ct(setup, savefig=None):
                       },
                   axis=1, result_type='expand'))
 
-    # import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
     print(df.columns)
     grp = df.groupby(["n"])
     # plt.figure(figsize=(6.1, 3.8))
@@ -529,7 +532,8 @@ def nba_print_mixture(mixture, state_dict, trails_ct_=None):
                 for u in range(n):
                     htimes[u] = np.mean(htimes[u])
 
-        return np.sum(np.max(np.exp(log_ll), axis=0))
+        return np.sum(np.exp(log_ll))
+        # return np.sum(np.max(np.exp(log_ll), axis=0))
 
     def print_chain(S, K, T, l):
         starting_prob = np.sum(S)
@@ -863,24 +867,76 @@ def test_methods_with_baseline_ct(*args, **kwargs):
     # (n, k, 0.1, trail_len, n_trails)
 
 
-def test_halyman(n, L, n_samples=100, duration=10, seed=None):
+def convert_trails(trails_ct):
+    pass
+
+
+def test_halyman(n, L, n_samples=1000, trail_len=200, num_iters=20, seed=None):
+    """
     mixture = ct.Mixture.random(n, L)
+    mixture.Ks /= 4
+    mixture.S[:] = 1
+    mixture.normalize()
+    """
+
+    mixture_dt_ = create_mixture_dt(n, L)
+    mixture_dt_.S[:] = 1
+    mixture_dt_.normalize()
+    mixture = ct.Mixture(mixture_dt_.S, np.array([M - np.eye(n) for M in mixture_dt_.Ms]))
+
     Q = mixture.Ks[0]
     print("Q=")
     print(Q)
     for i in range(1, L):
-        gamma = 2 * np.random.random(n)
+        gamma = 0.8 + 0.2 * np.random.random(n)
         mixture.Ks[i] = gamma[:, None] * Q
         print(f"gamma[{i}]=")
         print(gamma)
         # print(f"A[{i}]=")
         # print(mixture.Ks[i])
 
-    trails_ct = mixture.sample_ct(n_samples, duration)
+    mixture_dt = dt.Mixture(np.copy(mixture.S), np.copy(mixture.Ks))
+    Ms = mixture_dt.Ms
+    Ms[:, range(n), range(n)] = 0
+    Ms[:, range(n), range(n)] = 1 - np.sum(Ms, axis=2)
 
-    learned_mixture = ct.continuous_em_frydman(n, L, trails_ct)
-    recovery_error = mixture.recovery_error(learned_mixture)
-    print(f"frydman recovery_error={recovery_error:.3f}")
+    def to_py_trail(trail):
+        trail_py = []
+        for (i, _), (_, t) in zip(trail, trail[1:]):
+            trail_py.append((i-1, t))
+        # final_state = trail[-1][1]
+        # trail_py.append((final_state, 0))
+        return trail_py
+
+    import htinf
+    trails, _ = htinf.get_trails_ct(mixture_dt, n_samples, trail_len)
+    trails_py = [to_py_trail(trail) for trail in trails]
+
+    htinf_learned_mixture = htinf.em_ct(n, L, trails, num_iters=num_iters, learn_start=False)
+    htinf_recovery_error = mixture.recovery_error(htinf_learned_mixture)
+    print(f"htinf recovery_error={htinf_recovery_error:.3f}")
+
+    # trails_ct = mixture.sample_ct(n_samples, duration)
+    frydman_learned_mixture = ct.continuous_em_frydman(n, L, trails_py, max_iter=num_iters)
+    frydman_recovery_error = mixture.recovery_error(frydman_learned_mixture)
+    print(f"frydman recovery_error={frydman_recovery_error:.3f}")
+
+    # import pdb; pdb.set_trace()
+
+    return {"frydman_recovery_error": frydman_recovery_error,
+            "htinf_recovery_error": htinf_recovery_error}
 
 
+def test_agg(n, L, n_samples=100, trail_len=100, seed=None):
+    mixture = dt.Mixture.random(n, L)
+    mixture.S[:] = 1
+    mixture.normalize()
+
+    print(mixture)
+
+    import htinf
+    trails, _ = htinf.get_trails(mixture, n_samples, trail_len)
+    trails_py = [[i-1 for i in trail] for trail in trails]
+
+    dt.learn_agg(n, L, trails_py, mixture=mixture)
 
