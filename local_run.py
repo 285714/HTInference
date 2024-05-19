@@ -7,6 +7,7 @@ if __name__ == '__main__':
 
     # test_halyman(4, 2)
 
+    """
     # test_agg(4, 1)
 
     nba_ht(6, "DEN", 2022, num_iters=100, max_trail_time=20)
@@ -18,6 +19,32 @@ if __name__ == '__main__':
     # nba_ht(3, "HOU", 2022, num_iters=100, max_trail_time=20)
 
     # ["GSW", "LAL", "BOS", "MIA", "LAC", "HOU"]
+    """
+
+    plot_test_grid({
+        "n": [25],
+        "max_iter": [100000],
+        "noise_std": [0, 0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+        "noise": [1.0],
+        "seed": range(5),
+    })
+
+
+    # test_wittmann(5, n_trails=10, t_len=1000)
+
+    """
+    plot_test_wittmann({
+        "n": [5],
+        "n_trails": [100],
+        "t_len": np.linspace(10, 50, 10, dtype=int),
+        "seed": range(5),
+    })
+    """
+
+
+    # test_halyman(4, 2)
+
+    # test_agg(4, 2)
 
 
     # nba_ht(6, "BOS", 2022, num_iters=100)
