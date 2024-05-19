@@ -177,6 +177,31 @@ def plot_test_dag(setup, savefig=None):
 
 
 @memoize
+def test_grid2(n, max_iter, noise_std=0, noise="homo", seed=None):
+    import htinf2 as htpy
+    mixture = create_graph(n, "grid", selfloops=True)
+    M = mixture.Ms[0]
+    L = np.eye(n) - M.T
+    Linv = np.linalg.pinv(L)
+    H_true = htpy.ht_from_Linv(Linv, L)
+
+    if noise == "homo":
+        H_noise = H_true + np.random.normal(0, noise_std, size=H_true.shape)
+    else:
+        H_noise = H_true + np.random.normal(0, H_true * noise_std / noise)
+
+    M_gd, loss = htpy.learn(H_noise)
+    mixture_gd = dt.Mixture(mixture.S, np.array([M_gd]))
+    error_gd = mixture.recovery_error(mixture_gd)
+
+    M_wittmann = htpy.wittmann(H_noise)
+    mixture_wittmann = dt.Mixture(mixture.S, np.array([M_wittmann]))
+    error_wittmann = mixture.recovery_error(mixture_wittmann)
+
+    print(f"TV: gd={error_gd}, wittmann={error_wittmann}")
+    return {"tv": error_gd, "loss": loss, "mixture": mixture_gd, "tv_wittmann": error_wittmann}
+
+@memoize
 def test_grid(n, max_iter, noise_std=0, noise="homo", seed=None):
     import htinf
     mixture = create_graph(n, "grid", selfloops=True)
@@ -194,7 +219,7 @@ def test_grid(n, max_iter, noise_std=0, noise="homo", seed=None):
 @genpath
 def plot_test_grid(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
-    df = df.join(df.astype("object").apply(lambda row: test_grid(row.n, row.max_iter, noise_std=row.noise_std, noise=row.noise, seed=row.seed),
+    df = df.join(df.astype("object").apply(lambda row: test_grid2(row.n, row.max_iter, noise_std=row.noise_std, noise=row.noise, seed=row.seed),
                   axis=1, result_type='expand'))
 
     grp = df.groupby("noise_std")
@@ -205,7 +230,14 @@ def plot_test_grid(setup, savefig=None):
     mean = x.mean()
     std = x.std()
     config = next_config()
-    ax1.plot(mean.index, mean, label="recovery_error", **config)
+    ax1.plot(mean.index, mean, label="recovery_error ours", **config)
+    ax1.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+    x = grp["tv_wittmann"]
+    mean = x.mean()
+    std = x.std()
+    config = next_config()
+    ax1.plot(mean.index, mean, label="recovery_error Wittmann", **config)
     ax1.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
 
     x = grp["loss"]
@@ -275,7 +307,7 @@ def test_single_chain(n, graph_type, random, from_trails, n_trails, trail_len, m
 @genpath
 def plot_test_single_chain(setup, savefig=None):
     df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
-    df = df.join(df.astype("object").apply(lambda row: test_single_chain(row.n, row.graph_type, row.random, row.from_trails, row.n_trails, row.trail_len, max_iter=row.max_iter, seed=row.seed),
+    df = df.join(df.astype("object").apply(lambda row: test_single_chain2(row.n, row.graph_type, row.random, row.from_trails, row.n_trails, row.trail_len, max_iter=row.max_iter, seed=row.seed),
                   axis=1, result_type='expand'))
 
     # plt.figure()
@@ -878,5 +910,70 @@ def test_halyman(n, L, n_samples=100, duration=10, seed=None):
     recovery_error = mixture.recovery_error(learned_mixture)
     print(f"frydman recovery_error={recovery_error:.3f}")
 
+
+def test_agg(n, L, n_samples=100, t_len=100, seed=None):
+    mixture = dt.Mixture.random(n, 1)
+    mixture.S[:] = 1
+    mixture.normalize()
+
+    trails, _ = mixture.sample(n_samples=n_samples, t_len=t_len)
+
+
+@memoize
+def test_wittmann(n, n_trails=10, t_len=1000, seed=None):
+    print(f"n={n}, n_trails={n_trails}, t_len={t_len}")
+    import htinf2 as htpy
+
+    mixture = dt.Mixture.random(n, 1)
+    M = mixture.Ms[0]
+
+    trails, _ = htpy.sample_trails(mixture, trail_len=t_len, n_trails=n_trails)
+    H_train, _, _ = htpy.ht_from_trails(n, trails, return_var=True)
+
+    M_wittmann = htpy.wittmann(H_train)
+    mixture_wittmann = dt.Mixture(mixture.S, np.array([M_wittmann]))
+    error_wittmann = mixture.recovery_error(mixture_wittmann)
+    print("(wittmann) error:", error_wittmann) # np.sum(np.abs(M - M_wittmann))
+
+    Linv_wittmann = np.linalg.pinv(np.eye(n) - M_wittmann.T)
+    Linv_wittmann -= np.sum(Linv_wittmann, axis=1)[:, None] / n
+    Linv_start = np.copy(Linv_wittmann)
+
+    Linv_gd, _ = htpy.adam(Linv_start, lambda Linv, L: htpy.grad_loss(Linv, L, H_train))
+    M_gd = np.eye(n) - np.linalg.pinv(Linv_gd, rcond=1e-3).T
+    mixture_gd = dt.Mixture(mixture.S, np.array([M_gd]))
+    error_gd = mixture.recovery_error(mixture_gd)
+    print(f"(gd) error:", error_gd) # np.sum(np.abs(M - M_gd)), np.linalg.norm(M - M_gd)**2 / 2
+
+    return {"error_wittmann": error_wittmann, "error_gd": error_gd}
+
+
+@genpath
+def plot_test_wittmann(setup, savefig=None):
+    df = pd.DataFrame(itertools.product(*setup.values()), columns=setup.keys())
+    df = df.join(df.astype("object").apply(lambda row: test_wittmann(row.n, row.n_trails, row.t_len, seed=row.seed), axis=1, result_type='expand'))
+
+    # import pdb; pdb.set_trace()
+    grp = df.groupby("t_len")
+
+    x = grp["error_wittmann"]
+    mean = x.mean()
+    std = x.std()
+    config = next_config()
+    plt.plot(mean.index, mean, label="Wittmann", **config)
+    plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+    x = grp["error_gd"]
+    mean = x.mean()
+    std = x.std()
+    config = next_config()
+    plt.plot(mean.index, mean, label="Ours", **config)
+    plt.fill_between(mean.index, mean - std, mean + std, alpha=0.2)
+
+    plt.xlabel("trail length")
+    plt.ylabel("recovery error")
+    plt.title(f"uniform random $M$ for $n={setup['n'][0]}$ and ${setup['n_trails'][0]}$ trails")
+    plt.legend()
+    savefig()
 
 
